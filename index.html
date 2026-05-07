@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#3266ad"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="FinControl"/>
+<meta name="description" content="Control financiero personal con IA"/>
+<title>FinControl Personal</title>
+
+<script>
+const manifestData = {
+  name: "FinControl Personal",
+  short_name: "FinControl",
+  description: "Control financiero personal con IA",
+  start_url: ".",
+  display: "standalone",
+  background_color: "#ffffff",
+  theme_color: "#3266ad",
+  orientation: "portrait",
+  icons: [
+    { src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIgMTkyIj48cmVjdCB3aWR0aD0iMTkyIiBoZWlnaHQ9IjE5MiIgcng9IjQwIiBmaWxsPSIjMzI2NmFkIi8+PHRleHQgeT0iMTI4IiB4PSI5NiIgZm9udC1zaXplPSIxMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IndoaXRlIj7wn5KwPC90ZXh0Pjwvc3ZnPg==", sizes: "192x192", type: "image/svg+xml" },
+    { src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzMyNjZhZCIvPjx0ZXh0IHk9IjM0MCIgeD0iMjU2IiBmb250LXNpemU9IjI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkrA8L3RleHQ+PC9zdmc+", sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type:"application/json"});
+const manifestURL = URL.createObjectURL(blob);
+const link = document.createElement("link");
+link.rel = "manifest"; link.href = manifestURL;
+document.head.appendChild(link);
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7fa;color:#1a1a2e;overscroll-behavior:none;overflow-x:hidden}
+:root{--blue:#3266ad;--green:#1D9E75;--red:#D85A30;--amber:#BA7517;--purple:#7F77DD;--gray:#888780;--card:#ffffff;--bg:#f5f7fa;--border:#e0e4ea;--text2:#6b7280;--text3:#9ca3af}
+input,select,textarea{font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;width:100%;background:#fff;color:#1a1a2e;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+button{font-family:inherit;cursor:pointer}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1rem}
+::-webkit-scrollbar{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const {useState,useRef,useEffect}=React;
+
+const FMT=(n)=>`S/ ${Number(n).toLocaleString("es-PE",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const HOY=()=>new Date().toISOString().split("T")[0];
+const MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const CATS_G=["Alimentación","Transporte","Servicios","Salud","Educación","Entretenimiento","Ropa","Otros"];
+const CATS_I=["Sueldo","Freelance","Negocio","Inversión","Otros"];
+const ICONS={Alimentación:"🛒",Transporte:"🚗",Servicios:"💡",Salud:"❤️",Educación:"📚",Entretenimiento:"🎬",Ropa:"👗",Otros:"📦",Sueldo:"💼",Freelance:"💻",Negocio:"🏪",Inversión:"📈"};
+const COLORS={Alimentación:"#3266ad",Transporte:"#1D9E75",Servicios:"#BA7517",Salud:"#D85A30",Educación:"#7F77DD",Entretenimiento:"#D4537E",Ropa:"#0F6E56",Otros:"#888780",Sueldo:"#1D9E75",Freelance:"#3266ad",Negocio:"#7F77DD",Inversión:"#BA7517"};
+
+const INIT={
+  cuentas:[
+    {id:1,nombre:"BCP Ahorros",saldo:3200,color:"#3266ad",icon:"🏦"},
+    {id:2,nombre:"Caja Chica",saldo:450,color:"#1D9E75",icon:"💵"},
+  ],
+  transacciones:[
+    {id:1,tipo:"gasto",monto:85,categoria:"Alimentación",descripcion:"Supermercado Wong",fecha:"2026-05-06",cuenta:1},
+    {id:2,tipo:"ingreso",monto:3500,categoria:"Sueldo",descripcion:"Sueldo mayo",fecha:"2026-05-01",cuenta:1},
+    {id:3,tipo:"gasto",monto:120,categoria:"Servicios",descripcion:"Luz y agua",fecha:"2026-05-03",cuenta:1},
+    {id:4,tipo:"gasto",monto:40,categoria:"Transporte",descripcion:"Uber semana",fecha:"2026-05-05",cuenta:2},
+    {id:5,tipo:"gasto",monto:65,categoria:"Entretenimiento",descripcion:"Netflix + Spotify",fecha:"2026-05-04",cuenta:1},
+    {id:6,tipo:"ingreso",monto:500,categoria:"Freelance",descripcion:"Proyecto web",fecha:"2026-05-02",cuenta:1},
+  ],
+  creditos:[
+    {id:1,nombre:"Tarjeta Visa BCP",deuda:1200,original:2000,cuota:250,vencimiento:"2026-05-20",color:"#D85A30"},
+  ],
+  compromisos:[
+    {id:1,nombre:"Alquiler",monto:900,dia:1,icon:"🏠"},
+    {id:2,nombre:"Internet Claro",monto:89,dia:15,icon:"📡"},
+    {id:3,nombre:"Seguro Salud",monto:120,dia:10,icon:"❤️"},
+  ],
+};
+
+const LKEY="fincontrol_v1";
+function loadData(){try{const d=localStorage.getItem(LKEY);return d?JSON.parse(d):INIT;}catch{return INIT;}}
+function saveData(d){try{localStorage.setItem(LKEY,JSON.stringify(d));}catch{}}
+
+async function callClaude(messages){
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages})});
+  const d=await r.json();
+  return d.content?.map(b=>b.text||"").join("")||"";
+}
+
+function Donut({segs,size=110,thick=20}){
+  const tot=segs.reduce((a,s)=>a+s.v,0)||1;
+  const r=(size/2)-thick/2,circ=2*Math.PI*r;
+  let off=0;
+  return(
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f0f0f0" strokeWidth={thick}/>
+      {segs.map((s,i)=>{
+        const dash=(s.v/tot)*circ,gap=circ-dash;
+        const el=<circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={s.c} strokeWidth={thick} strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-off} style={{transform:"rotate(-90deg)",transformOrigin:"50% 50%"}}/>;
+        off+=dash;return el;
+      })}
+    </svg>
+  );
+}
+
+function Gauge({value,max,color,size=110}){
+  const pct=Math.min(1,value/max),r=40,circ=Math.PI*r,dash=pct*circ;
+  return(
+    <svg width={size} height={size*0.6} viewBox="0 0 100 60">
+      <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke="#f0f0f0" strokeWidth={10} strokeLinecap="round"/>
+      <path d="M10,50 A40,40 0 0,1 90,50" fill="none" stroke={color} strokeWidth={10} strokeLinecap="round" strokeDasharray={`${dash} ${circ}`}/>
+      <text x="50" y="46" textAnchor="middle" fontSize="14" fontWeight="600" fill="#1a1a2e">{value.toFixed(1)}</text>
+      <text x="50" y="57" textAnchor="middle" fontSize="8" fill="#9ca3af">meses</text>
+    </svg>
+  );
+}
+
+const Bar=({val,max,color,h=8})=>(
+  <div style={{background:"#f0f0f0",borderRadius:h,height:h,overflow:"hidden"}}>
+    <div style={{width:`${Math.min(100,(val/max)*100)}%`,height:"100%",background:color,borderRadius:h}}/>
+  </div>
+);
+
+const TABS=[{l:"Inicio",e:"🏠"},{l:"Cuentas",e:"🏦"},{l:"Movimientos",e:"↕️"},{l:"Créditos",e:"💳"},{l:"Proyección",e:"📈"},{l:"Asesor IA",e:"🤖"}];
+
+function App(){
+  const [data,setData]=useState(loadData);
+  const [tab,setTab]=useState(0);
+  const [modal,setModal]=useState(null);
+  const [form,setForm]=useState({});
+  const [imgPrev,setImgPrev]=useState(null);
+  const [scanning,setScanning]=useState(false);
+  const [scanRes,setScanRes]=useState(null);
+  const [aiText,setAiText]=useState("");
+  const [aiLoading,setAiLoading]=useState(false);
+  const [aiQ,setAiQ]=useState("");
+  const [deferredPrompt,setDeferredPrompt]=useState(null);
+  const [showInstall,setShowInstall]=useState(false);
+  const camRef=useRef();
+
+  useEffect(()=>saveData(data),[data]);
+
+  useEffect(()=>{
+    const handler=e=>{e.preventDefault();setDeferredPrompt(e);setShowInstall(true);};
+    window.addEventListener("beforeinstallprompt",handler);
+    return()=>window.removeEventListener("beforeinstallprompt",handler);
+  },[]);
+
+  const saldoTotal=data.cuentas.reduce((a,c)=>a+c.saldo,0);
+  const deudaTotal=data.creditos.reduce((a,c)=>a+c.deuda,0);
+  const compMes=data.compromisos.reduce((a,c)=>a+c.monto,0);
+  const mesAct=new Date().getMonth();
+  const txMes=data.transacciones.filter(t=>new Date(t.fecha).getMonth()===mesAct);
+  const ingMes=txMes.filter(t=>t.tipo==="ingreso").reduce((a,t)=>a+t.monto,0);
+  const gastMes=txMes.filter(t=>t.tipo==="gasto").reduce((a,t)=>a+t.monto,0);
+  const balance=ingMes-gastMes;
+  const runway=saldoTotal/(gastMes||1);
+  const ratioG=ingMes>0?(gastMes/ingMes)*100:0;
+  const gastosCat=CATS_G.map(c=>({cat:c,total:txMes.filter(t=>t.tipo==="gasto"&&t.categoria===c).reduce((a,t)=>a+t.monto,0)})).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+  const maxGC=Math.max(...gastosCat.map(g=>g.total),1);
+  const proyec=Array.from({length:12},(_,i)=>({mes:MESES[(mesAct+1+i)%12],saldo:Math.max(0,saldoTotal+(ingMes-gastMes-compMes)*(i+1))}));
+  const maxProy=Math.max(...proyec.map(p=>p.saldo),saldoTotal,1);
+
+  function handlePhoto(e){
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const b64=ev.target.result.split(",")[1];
+      setImgPrev(ev.target.result);setModal("scan");
+      scanDoc(b64);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function scanDoc(b64){
+    setScanning(true);setScanRes(null);
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64}},{type:"text",text:`Analiza este documento financiero. Responde SOLO JSON sin backticks: {"tipo":"gasto o ingreso","monto":0,"descripcion":"nombre del lugar o concepto","categoria":"Alimentación|Transporte|Servicios|Salud|Educación|Entretenimiento|Ropa|Sueldo|Freelance|Negocio|Inversión|Otros","fecha":"YYYY-MM-DD","confianza":"alta|media|baja","nota":"observación breve"}`}]}]})});
+      const d=await r.json();
+      const txt=d.content?.map(b=>b.text||"").join("")||"{}";
+      const parsed=JSON.parse(txt.replace(/```json|```/g,"").trim());
+      setScanRes(parsed);setForm({...parsed,cuenta:data.cuentas[0]?.id});
+    }catch{setScanRes({error:"No se pudo leer. Usa mejor iluminación e inténtalo de nuevo."});}
+    setScanning(false);
+  }
+
+  function confirmarScan(){
+    if(!scanRes||scanRes.error)return;
+    const nueva={id:Date.now(),tipo:form.tipo||scanRes.tipo,monto:parseFloat(form.monto||scanRes.monto),categoria:form.categoria||scanRes.categoria,descripcion:form.descripcion||scanRes.descripcion,fecha:form.fecha||scanRes.fecha||HOY(),cuenta:parseInt(form.cuenta||data.cuentas[0]?.id)};
+    const sign=nueva.tipo==="ingreso"?1:-1;
+    setData(prev=>({...prev,transacciones:[nueva,...prev.transacciones],cuentas:prev.cuentas.map(c=>c.id===nueva.cuenta?{...c,saldo:c.saldo+sign*nueva.monto}:c)}));
+    setModal(null);setImgPrev(null);setScanRes(null);
+  }
+
+  async function getAdvice(){
+    setAiLoading(true);
+    const resp=await callClaude([{role:"user",content:`Eres asesor financiero personal peruano. Datos:
+- Saldo: S/ ${saldoTotal.toFixed(2)}, Ingresos mes: S/ ${ingMes.toFixed(2)}, Gastos mes: S/ ${gastMes.toFixed(2)}
+- Deuda: S/ ${deudaTotal.toFixed(2)}, Compromisos fijos: S/ ${compMes.toFixed(2)}, Runway: ${runway.toFixed(1)} meses
+- Gastos por categoría: ${gastosCat.map(g=>`${g.cat}: S/ ${g.total}`).join(", ")}
+Pregunta: ${aiQ||"¿Cuál es mi situación y qué debo hacer para mejorarla?"}
+Responde en español peruano, conciso y práctico, con 3 secciones: 💰 GENERAR MÁS INGRESOS / 🏦 AHORRAR MEJOR / 📈 INVERTIR INTELIGENTEMENTE`}]);
+    setAiText(resp);setAiLoading(false);
+  }
+
+  function registrarTx(){
+    if(!form.monto||!form.descripcion)return;
+    const nueva={id:Date.now(),tipo:form.tipo,monto:parseFloat(form.monto),categoria:form.categoria||(form.tipo==="gasto"?CATS_G[0]:CATS_I[0]),descripcion:form.descripcion,fecha:form.fecha||HOY(),cuenta:parseInt(form.cuenta)};
+    const sign=nueva.tipo==="ingreso"?1:-1;
+    setData(prev=>({...prev,transacciones:[nueva,...prev.transacciones],cuentas:prev.cuentas.map(c=>c.id===nueva.cuenta?{...c,saldo:c.saldo+sign*nueva.monto}:c)}));
+    setModal(null);
+  }
+
+  function exportCSV(){
+    const rows=[["Fecha","Tipo","Descripcion","Categoria","Monto","Cuenta"]];
+    data.transacciones.forEach(t=>{rows.push([t.fecha,t.tipo,t.descripcion,t.categoria,t.monto,data.cuentas.find(c=>c.id===t.cuenta)?.nombre||""]);});
+    const blob=new Blob([rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`fincontrol_${HOY()}.csv`;a.click();
+  }
+
+  async function instalarPWA(){
+    if(!deferredPrompt)return;
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice;
+    if(outcome==="accepted"){setShowInstall(false);setDeferredPrompt(null);}
+  }
+
+  const closeModal=()=>{setModal(null);setImgPrev(null);setScanRes(null);};
+  const setF=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  return(
+    <div style={{maxWidth:480,margin:"0 auto",minHeight:"100vh",background:"#f5f7fa",paddingBottom:90}}>
+
+      {/* BANNER INSTALAR */}
+      {showInstall&&(
+        <div style={{background:"#3266ad",color:"#fff",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:13}}>📲 Instala FinControl en tu celular</span>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={instalarPWA} style={{background:"#fff",color:"#3266ad",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:700}}>Instalar</button>
+            <button onClick={()=>setShowInstall(false)} style={{background:"transparent",color:"#fff",border:"none",fontSize:20}}>✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER */}
+      <div style={{background:"#3266ad",padding:"1.25rem 1rem 1.5rem",color:"#fff"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div>
+            <p style={{fontSize:11,opacity:.75,margin:"0 0 2px",letterSpacing:1,textTransform:"uppercase"}}>Patrimonio total</p>
+            <p style={{fontSize:30,fontWeight:700,margin:0,letterSpacing:-1}}>{FMT(saldoTotal)}</p>
+            <span style={{fontSize:11,background:balance>=0?"#1D9E75":"#D85A30",padding:"3px 10px",borderRadius:20,display:"inline-block",marginTop:4}}>
+              {balance>=0?"▲":"▼"} {FMT(Math.abs(balance))} este mes
+            </span>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"flex-end"}}>
+            <button onClick={()=>camRef.current.click()} style={{background:"rgba(255,255,255,.2)",border:"1px solid rgba(255,255,255,.4)",color:"#fff",borderRadius:12,padding:"9px 14px",fontSize:13,fontWeight:600}}>
+              📷 Escanear
+            </button>
+            <button onClick={exportCSV} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:12,padding:"6px 12px",fontSize:11}}>
+              📥 Exportar CSV
+            </button>
+          </div>
+          <input ref={camRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handlePhoto}/>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {[{l:"Ingresos",v:FMT(ingMes),bg:"rgba(29,158,117,.3)"},{l:"Gastos",v:FMT(gastMes),bg:"rgba(216,90,48,.3)"},{l:"Deuda",v:FMT(deudaTotal),bg:"rgba(0,0,0,.2)"}].map(s=>(
+            <div key={s.l} style={{flex:1,background:s.bg,borderRadius:10,padding:"8px 10px"}}>
+              <p style={{fontSize:10,opacity:.8,margin:"0 0 2px"}}>{s.l}</p>
+              <p style={{fontSize:13,fontWeight:600,margin:0}}>{s.v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* NAV */}
+      <div style={{display:"flex",overflowX:"auto",background:"#fff",borderBottom:"1px solid #e0e4ea",scrollbarWidth:"none",position:"sticky",top:0,zIndex:10}}>
+        {TABS.map((t,i)=>(
+          <button key={i} onClick={()=>setTab(i)} style={{flex:"0 0 auto",padding:"10px 12px",background:"transparent",color:tab===i?"#3266ad":"#9ca3af",border:"none",borderBottom:tab===i?"2.5px solid #3266ad":"2.5px solid transparent",cursor:"pointer",fontSize:11,fontWeight:tab===i?700:400,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+            <span style={{fontSize:18}}>{t.e}</span>{t.l}
+          </button>
+        ))}
+      </div>
+
+      <div style={{padding:"1rem"}}>
+
+        {/* ── INICIO ── */}
+        {tab===0&&<>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div className="card" style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"1rem .75rem"}}>
+              <p style={{fontSize:11,color:"#6b7280",margin:"0 0 6px",alignSelf:"flex-start"}}>Runway financiero</p>
+              <Gauge value={runway} max={12} color={runway>6?"#1D9E75":runway>3?"#BA7517":"#D85A30"} size={110}/>
+              <p style={{fontSize:10,color:"#9ca3af",marginTop:4,textAlign:"center"}}>
+                {runway>6?"Excelente ✓":runway>3?"Aceptable ⚠️":"Atención 🔴"}
+              </p>
+            </div>
+            <div className="card">
+              <p style={{fontSize:11,color:"#6b7280",margin:"0 0 8px"}}>Ratio gasto/ingreso</p>
+              <p style={{fontSize:32,fontWeight:700,margin:"0 0 6px",color:ratioG<70?"#1D9E75":ratioG<90?"#BA7517":"#D85A30"}}>
+                {ratioG.toFixed(0)}%
+              </p>
+              <Bar val={ratioG} max={100} color={ratioG<70?"#1D9E75":ratioG<90?"#BA7517":"#D85A30"} h={10}/>
+              <p style={{fontSize:10,color:"#9ca3af",marginTop:6}}>
+                {ratioG<70?"Muy saludable ✓":ratioG<90?"Moderado ⚠️":"Gastas demasiado 🔴"}
+              </p>
+            </div>
+          </div>
+
+          <div className="card" style={{marginBottom:14}}>
+            <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>Gastos por categoría — {MESES[mesAct]}</p>
+            {gastosCat.length===0
+              ?<p style={{color:"#9ca3af",fontSize:13}}>Sin gastos registrados este mes</p>
+              :<div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{flexShrink:0}}>
+                  <Donut segs={gastosCat.map(g=>({v:g.total,c:COLORS[g.cat]||"#888"}))} size={110} thick={20}/>
+                </div>
+                <div style={{flex:1}}>
+                  {gastosCat.map(g=>(
+                    <div key={g.cat} style={{marginBottom:9}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                        <span style={{fontSize:12,display:"flex",alignItems:"center",gap:5}}>
+                          <span style={{width:8,height:8,borderRadius:2,background:COLORS[g.cat],display:"inline-block"}}/>
+                          {ICONS[g.cat]} {g.cat}
+                        </span>
+                        <span style={{fontSize:11,fontWeight:600}}>{FMT(g.total)}</span>
+                      </div>
+                      <Bar val={g.total} max={maxGC} color={COLORS[g.cat]} h={5}/>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
+          </div>
+
+          <div className="card" style={{marginBottom:14}}>
+            <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>Flujo del mes</p>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
+              <div style={{flex:Math.max(ingMes,1),background:"#E1F5EE",borderRadius:12,padding:"12px",minWidth:0}}>
+                <p style={{fontSize:10,color:"#085041",margin:"0 0 2px"}}>Ingresos</p>
+                <p style={{fontSize:16,fontWeight:700,color:"#1D9E75",margin:0}}>{FMT(ingMes)}</p>
+              </div>
+              <div style={{flex:Math.max(gastMes,1),background:"#FAECE7",borderRadius:12,padding:"12px",minWidth:0}}>
+                <p style={{fontSize:10,color:"#4A1B0C",margin:"0 0 2px"}}>Gastos</p>
+                <p style={{fontSize:16,fontWeight:700,color:"#D85A30",margin:0}}>{FMT(gastMes)}</p>
+              </div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:balance>=0?"#E1F5EE":"#FAECE7",borderRadius:12}}>
+              <span style={{fontSize:22}}>{balance>=0?"💚":"🔴"}</span>
+              <div>
+                <p style={{fontSize:11,margin:0,color:"#6b7280"}}>Ahorro neto del mes</p>
+                <p style={{fontSize:20,fontWeight:700,margin:0,color:balance>=0?"#1D9E75":"#D85A30"}}>{balance>=0?"+":""}{FMT(balance)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <p style={{fontWeight:600,margin:0,fontSize:15}}>Compromisos del mes</p>
+              <span style={{fontSize:14,fontWeight:700,color:"#BA7517"}}>{FMT(compMes)}</span>
+            </div>
+            {data.compromisos.map((c,i)=>(
+              <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderTop:i>0?"1px solid #f0f0f0":"none"}}>
+                <span style={{fontSize:22}}>{c.icon}</span>
+                <div style={{flex:1}}>
+                  <p style={{margin:0,fontSize:13,fontWeight:500}}>{c.nombre}</p>
+                  <p style={{margin:0,fontSize:11,color:"#9ca3af"}}>Vence día {c.dia}</p>
+                </div>
+                <span style={{fontWeight:600,fontSize:14}}>{FMT(c.monto)}</span>
+              </div>
+            ))}
+          </div>
+        </>}
+
+        {/* ── CUENTAS ── */}
+        {tab===1&&<>
+          {data.cuentas.map(c=>{
+            const txC=data.transacciones.filter(t=>t.cuenta===c.id);
+            const inC=txC.filter(t=>t.tipo==="ingreso").reduce((a,t)=>a+t.monto,0);
+            const outC=txC.filter(t=>t.tipo==="gasto").reduce((a,t)=>a+t.monto,0);
+            return(
+              <div key={c.id} style={{background:"#fff",border:"1px solid #e0e4ea",borderRadius:16,marginBottom:12,overflow:"hidden"}}>
+                <div style={{background:c.color,padding:"1.25rem 1rem",color:"#fff"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div>
+                      <p style={{fontSize:12,opacity:.8,margin:"0 0 2px"}}>{c.icon} {c.nombre}</p>
+                      <p style={{fontSize:28,fontWeight:700,margin:0}}>{FMT(c.saldo)}</p>
+                    </div>
+                    <span style={{fontSize:11,background:"rgba(255,255,255,.2)",padding:"4px 10px",borderRadius:20}}>{txC.length} mov.</span>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",padding:"1rem",gap:10}}>
+                  <div style={{background:"#E1F5EE",borderRadius:10,padding:"10px 12px"}}>
+                    <p style={{fontSize:10,color:"#085041",margin:"0 0 2px"}}>Ingresos</p>
+                    <p style={{fontSize:15,fontWeight:700,color:"#1D9E75",margin:0}}>{FMT(inC)}</p>
+                  </div>
+                  <div style={{background:"#FAECE7",borderRadius:10,padding:"10px 12px"}}>
+                    <p style={{fontSize:10,color:"#4A1B0C",margin:"0 0 2px"}}>Gastos</p>
+                    <p style={{fontSize:15,fontWeight:700,color:"#D85A30",margin:0}}>{FMT(outC)}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={()=>{setForm({nombre:"",saldo:""});setModal("cuenta");}} style={{width:"100%",padding:14,border:"2px dashed #e0e4ea",borderRadius:16,background:"transparent",cursor:"pointer",color:"#6b7280",fontSize:14}}>
+            + Agregar cuenta
+          </button>
+        </>}
+
+        {/* ── MOVIMIENTOS ── */}
+        {tab===2&&<>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <button onClick={()=>{setForm({tipo:"gasto",fecha:HOY(),cuenta:data.cuentas[0]?.id,categoria:CATS_G[0]});setModal("tx");}} style={{padding:"14px 10px",background:"#FAECE7",color:"#993C1D",border:"1px solid #D85A30",borderRadius:14,fontWeight:600,fontSize:14}}>
+              🔴 Registrar gasto
+            </button>
+            <button onClick={()=>{setForm({tipo:"ingreso",fecha:HOY(),cuenta:data.cuentas[0]?.id,categoria:CATS_I[0]});setModal("tx");}} style={{padding:"14px 10px",background:"#E1F5EE",color:"#085041",border:"1px solid #1D9E75",borderRadius:14,fontWeight:600,fontSize:14}}>
+              🟢 Registrar ingreso
+            </button>
+          </div>
+          <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>Historial completo</p>
+          {data.transacciones.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(t=>(
+            <div key={t.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #f0f0f0"}}>
+              <div style={{width:44,height:44,borderRadius:12,background:t.tipo==="ingreso"?"#E1F5EE":"#FAECE7",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                {ICONS[t.categoria]||"📦"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:0,fontWeight:600,fontSize:13,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.descripcion}</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:"#9ca3af"}}>{t.categoria} · {t.fecha}</p>
+              </div>
+              <p style={{margin:0,fontWeight:700,fontSize:15,color:t.tipo==="ingreso"?"#1D9E75":"#D85A30",flexShrink:0}}>
+                {t.tipo==="ingreso"?"+":"−"}{FMT(t.monto)}
+              </p>
+            </div>
+          ))}
+        </>}
+
+        {/* ── CRÉDITOS ── */}
+        {tab===3&&<>
+          {data.creditos.map(c=>{
+            const pct=Math.round(((c.original-c.deuda)/c.original)*100);
+            return(
+              <div key={c.id} style={{background:"#fff",border:"1px solid #e0e4ea",borderRadius:16,marginBottom:14,overflow:"hidden"}}>
+                <div style={{background:"#D85A30",padding:"1rem",color:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <p style={{fontSize:12,opacity:.8,margin:"0 0 2px"}}>💳 {c.nombre}</p>
+                    <p style={{fontSize:24,fontWeight:700,margin:0}}>{FMT(c.deuda)}</p>
+                    <p style={{fontSize:11,opacity:.8,margin:"4px 0 0"}}>deuda pendiente</p>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <p style={{fontSize:11,opacity:.8,margin:"0 0 2px"}}>pagado</p>
+                    <p style={{fontSize:30,fontWeight:700,margin:0}}>{pct}%</p>
+                  </div>
+                </div>
+                <div style={{padding:"1rem"}}>
+                  <Bar val={pct} max={100} color="#1D9E75" h={12}/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:12}}>
+                    {[{l:"Cuota/mes",v:FMT(c.cuota),col:"#D85A30"},{l:"Cuotas rest.",v:`${Math.ceil(c.deuda/c.cuota)}`,col:"#BA7517"},{l:"Vence",v:c.vencimiento.slice(5),col:"#3266ad"}].map(item=>(
+                      <div key={item.l} style={{background:"#f5f7fa",borderRadius:10,padding:"8px 10px"}}>
+                        <p style={{fontSize:9,color:"#9ca3af",margin:"0 0 2px"}}>{item.l}</p>
+                        <p style={{fontSize:14,fontWeight:700,margin:0,color:item.col}}>{item.v}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div className="card">
+            <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>📅 Compromisos fijos</p>
+            {data.compromisos.map((c,i)=>(
+              <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderTop:i>0?"1px solid #f0f0f0":"none"}}>
+                <div style={{width:36,height:36,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{c.icon}</div>
+                <div style={{flex:1}}>
+                  <p style={{margin:0,fontSize:13,fontWeight:500}}>{c.nombre}</p>
+                  <p style={{margin:0,fontSize:11,color:"#9ca3af"}}>Día {c.dia} de cada mes</p>
+                </div>
+                <span style={{fontWeight:600,color:"#BA7517"}}>{FMT(c.monto)}</span>
+              </div>
+            ))}
+            <div style={{marginTop:12,padding:"10px 12px",background:"#FAEEDA",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontWeight:600}}>Total</span>
+              <span style={{fontWeight:700,color:"#BA7517"}}>{FMT(compMes)}</span>
+            </div>
+          </div>
+        </>}
+
+        {/* ── PROYECCIÓN ── */}
+        {tab===4&&<>
+          <div className="card" style={{marginBottom:14}}>
+            <p style={{fontWeight:600,margin:"0 0 16px",fontSize:15}}>Proyección de saldo — 12 meses</p>
+            <div style={{display:"flex",alignItems:"flex-end",gap:3,height:150,marginBottom:8}}>
+              <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <div style={{width:"100%",background:"#3266ad",borderRadius:"4px 4px 0 0",height:`${(saldoTotal/maxProy)*140}px`}}/>
+                <span style={{fontSize:8,color:"#3266ad",fontWeight:700}}>Hoy</span>
+              </div>
+              {proyec.map((p,i)=>{
+                const h=Math.max(4,(p.saldo/maxProy)*140);
+                const col=p.saldo<=0?"#D85A30":i<3?"#5DCAA5":i<7?"#378ADD":"#7F77DD";
+                return(
+                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                    <div style={{width:"100%",background:col,borderRadius:"4px 4px 0 0",height:`${h}px`}}/>
+                    <span style={{fontSize:8,color:"#9ca3af",writingMode:"vertical-rl",transform:"rotate(180deg)"}}>{p.mes}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            {[{l:"Ahorro/mes proyectado",v:FMT(Math.max(0,ingMes-gastMes-compMes)),c:"#1D9E75",bg:"#E1F5EE"},{l:"Saldo en 12 meses",v:FMT(Math.max(0,saldoTotal+(ingMes-gastMes-compMes)*12)),c:"#3266ad",bg:"#E6F1FB"},{l:"Cuotas crédito/mes",v:FMT(data.creditos.reduce((a,c)=>a+c.cuota,0)),c:"#D85A30",bg:"#FAECE7"},{l:"Compromisos/mes",v:FMT(compMes),c:"#BA7517",bg:"#FAEEDA"}].map(k=>(
+              <div key={k.l} style={{background:k.bg,borderRadius:14,padding:"12px 14px"}}>
+                <p style={{fontSize:10,color:"#6b7280",margin:"0 0 4px"}}>{k.l}</p>
+                <p style={{fontSize:17,fontWeight:700,margin:0,color:k.c}}>{k.v}</p>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>Desglose mensual</p>
+            {[{e:"💚",l:"Ingresos totales",v:ingMes,pos:true},{e:"🔴",l:"Gastos variables",v:gastMes,pos:false},{e:"🏠",l:"Compromisos fijos",v:compMes,pos:false},{e:"💳",l:"Cuotas crédito",v:data.creditos.reduce((a,c)=>a+c.cuota,0),pos:false}].map((r,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #f0f0f0"}}>
+                <span style={{fontSize:13}}>{r.e} {r.l}</span>
+                <span style={{fontSize:14,fontWeight:700,color:r.pos?"#1D9E75":"#D85A30"}}>{r.pos?"+":"−"}{FMT(r.v)}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"10px 12px",background:balance-compMes>=0?"#E1F5EE":"#FAECE7",borderRadius:10,marginTop:10}}>
+              <span style={{fontWeight:600}}>Flujo neto mensual</span>
+              <span style={{fontWeight:700,color:balance-compMes>=0?"#1D9E75":"#D85A30"}}>{FMT(balance-compMes)}</span>
+            </div>
+          </div>
+        </>}
+
+        {/* ── ASESOR IA ── */}
+        {tab===5&&<>
+          <div style={{background:"#3266ad",borderRadius:16,padding:"1.25rem",color:"#fff",marginBottom:14}}>
+            <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>🤖 Tu salud financiera hoy</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {[{l:"Saldo",v:FMT(saldoTotal)},{l:"Runway",v:`${runway.toFixed(1)} meses`},{l:"Ratio gasto",v:`${ratioG.toFixed(0)}%`},{l:"Deuda",v:FMT(deudaTotal)}].map(k=>(
+                <div key={k.l} style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"8px 12px"}}>
+                  <p style={{fontSize:10,opacity:.8,margin:"0 0 2px"}}>{k.l}</p>
+                  <p style={{fontSize:14,fontWeight:600,margin:0}}>{k.v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="card" style={{marginBottom:14}}>
+            <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>¿Qué quieres saber?</p>
+            <textarea value={aiQ} onChange={e=>setAiQ(e.target.value)} placeholder="Ej: ¿Cómo puedo ahorrar más? ¿Debo invertir o pagar mis deudas primero?" style={{width:"100%",minHeight:90,resize:"vertical",fontSize:13,borderRadius:10,border:"1px solid #e0e4ea",padding:10,background:"#f5f7fa",color:"#1a1a2e",fontFamily:"inherit"}}/>
+            <button onClick={getAdvice} disabled={aiLoading} style={{marginTop:10,width:"100%",padding:13,background:aiLoading?"#f0f0f0":"#3266ad",color:aiLoading?"#9ca3af":"#fff",border:"none",borderRadius:12,fontWeight:600,fontSize:14,cursor:aiLoading?"default":"pointer"}}>
+              {aiLoading?"⏳ Analizando tu situación...":"Obtener consejo personalizado ↗"}
+            </button>
+          </div>
+          {aiText&&(
+            <div className="card">
+              <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>💡 Consejo de tu asesor</p>
+              <div style={{fontSize:13,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{aiText}</div>
+            </div>
+          )}
+          {!aiText&&!aiLoading&&(
+            <div style={{background:"#f5f7fa",borderRadius:16,padding:"2rem",textAlign:"center"}}>
+              <p style={{fontSize:36,margin:"0 0 10px"}}>🤖</p>
+              <p style={{fontSize:13,color:"#9ca3af",margin:0,lineHeight:1.6}}>Tu asesor IA analiza tu saldo, gastos, ingresos, deudas y compromisos para darte un plan personalizado de ahorro, ingresos e inversión.</p>
+            </div>
+          )}
+        </>}
+      </div>
+
+      {/* ── MODAL ESCANEO ── */}
+      {modal==="scan"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",zIndex:200}}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"1.5rem 1rem",width:"100%",maxHeight:"90vh",overflowY:"auto",boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <p style={{fontWeight:600,margin:0,fontSize:16}}>📄 Documento escaneado</p>
+              <button onClick={closeModal} style={{background:"#f5f7fa",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer"}}>✕</button>
+            </div>
+            {imgPrev&&<img src={imgPrev} alt="Doc" style={{width:"100%",borderRadius:12,marginBottom:12,maxHeight:180,objectFit:"cover"}}/>}
+            {scanning&&(
+              <div style={{textAlign:"center",padding:"1.5rem",background:"#f5f7fa",borderRadius:12,marginBottom:12}}>
+                <p style={{fontSize:30,margin:"0 0 8px"}}>🔍</p>
+                <p style={{fontSize:13,color:"#6b7280",margin:0}}>Analizando con IA...</p>
+              </div>
+            )}
+            {scanRes?.error&&<div style={{background:"#FAECE7",borderRadius:10,padding:12,color:"#D85A30",fontSize:13,marginBottom:12}}>{scanRes.error}</div>}
+            {scanRes&&!scanRes.error&&<>
+              <div style={{background:scanRes.tipo==="gasto"?"#FAECE7":"#E1F5EE",borderRadius:12,padding:14,marginBottom:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:11,color:"#6b7280"}}>Extraído por IA</span>
+                  <span style={{fontSize:11,background:scanRes.confianza==="alta"?"#E1F5EE":"#FAEEDA",color:scanRes.confianza==="alta"?"#1D9E75":"#BA7517",padding:"2px 10px",borderRadius:20,fontWeight:600}}>{scanRes.confianza}</span>
+                </div>
+                <p style={{fontSize:28,fontWeight:700,margin:"4px 0",color:scanRes.tipo==="gasto"?"#D85A30":"#1D9E75"}}>
+                  {scanRes.tipo==="gasto"?"−":"+"}{FMT(scanRes.monto)}
+                </p>
+                <p style={{fontSize:13,margin:0,color:"#6b7280"}}>{ICONS[scanRes.categoria]} {scanRes.descripcion} · {scanRes.categoria}</p>
+                {scanRes.nota&&<p style={{fontSize:11,color:"#9ca3af",margin:"6px 0 0"}}>💬 {scanRes.nota}</p>}
+              </div>
+              {[{label:"Tipo",key:"tipo",type:"select",opts:["gasto","ingreso"]},{label:"Monto (S/)",key:"monto",type:"number"},{label:"Descripción",key:"descripcion",type:"text"},{label:"Categoría",key:"categoria",type:"select",opts:[...CATS_G,...CATS_I]},{label:"Fecha",key:"fecha",type:"date"}].map(f=>(
+                <div key={f.key} style={{marginBottom:10}}>
+                  <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>{f.label}</label>
+                  {f.type==="select"?<select value={form[f.key]||""} onChange={e=>setF(f.key,e.target.value)}>{f.opts.map(o=><option key={o}>{o}</option>)}</select>:<input type={f.type} value={form[f.key]||""} onChange={e=>setF(f.key,e.target.value)}/>}
+                </div>
+              ))}
+              <div style={{marginBottom:14}}>
+                <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>Cuenta</label>
+                <select value={form.cuenta||""} onChange={e=>setF("cuenta",e.target.value)}>
+                  {data.cuentas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+                </select>
+              </div>
+              <button onClick={confirmarScan} style={{width:"100%",padding:14,background:"#1D9E75",color:"#fff",border:"none",borderRadius:12,fontWeight:600,fontSize:15,cursor:"pointer"}}>
+                ✓ Confirmar y registrar
+              </button>
+            </>}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL TX MANUAL ── */}
+      {modal==="tx"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",zIndex:200}}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"1.5rem 1rem",width:"100%",maxHeight:"85vh",overflowY:"auto",boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontWeight:600,margin:0,fontSize:16}}>{form.tipo==="gasto"?"🔴 Registrar gasto":"🟢 Registrar ingreso"}</p>
+              <button onClick={()=>setModal(null)} style={{background:"#f5f7fa",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer"}}>✕</button>
+            </div>
+            {[{label:"Monto (S/)",key:"monto",type:"number"},{label:"Descripción",key:"descripcion",type:"text"},{label:"Fecha",key:"fecha",type:"date"}].map(f=>(
+              <div key={f.key} style={{marginBottom:12}}>
+                <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>{f.label}</label>
+                <input type={f.type} value={form[f.key]||""} onChange={e=>setF(f.key,e.target.value)}/>
+              </div>
+            ))}
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>Categoría</label>
+              <select value={form.categoria||""} onChange={e=>setF("categoria",e.target.value)}>
+                {(form.tipo==="gasto"?CATS_G:CATS_I).map(o=><option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>Cuenta</label>
+              <select value={form.cuenta||""} onChange={e=>setF("cuenta",e.target.value)}>
+                {data.cuentas.map(c=><option key={c.id} value={c.id}>{c.icon} {c.nombre}</option>)}
+              </select>
+            </div>
+            <button onClick={registrarTx} style={{width:"100%",padding:14,background:form.tipo==="ingreso"?"#1D9E75":"#D85A30",color:"#fff",border:"none",borderRadius:12,fontWeight:600,fontSize:15,cursor:"pointer"}}>
+              Registrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL CUENTA ── */}
+      {modal==="cuenta"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"flex-end",zIndex:200}}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"1.5rem 1rem",width:"100%",boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <p style={{fontWeight:600,margin:0,fontSize:16}}>🏦 Nueva cuenta</p>
+              <button onClick={()=>setModal(null)} style={{background:"#f5f7fa",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer"}}>✕</button>
+            </div>
+            {[{label:"Nombre de la cuenta",key:"nombre",type:"text"},{label:"Saldo inicial (S/)",key:"saldo",type:"number"}].map(f=>(
+              <div key={f.key} style={{marginBottom:12}}>
+                <label style={{fontSize:12,color:"#6b7280",display:"block",marginBottom:4}}>{f.label}</label>
+                <input type={f.type} value={form[f.key]||""} onChange={e=>setF(f.key,e.target.value)}/>
+              </div>
+            ))}
+            <button onClick={()=>{
+              if(!form.nombre)return;
+              setData(prev=>({...prev,cuentas:[...prev.cuentas,{id:Date.now(),nombre:form.nombre,saldo:parseFloat(form.saldo||0),color:"#7F77DD",icon:"💰"}]}));
+              setModal(null);
+            }} style={{width:"100%",padding:14,background:"#3266ad",color:"#fff",border:"none",borderRadius:12,fontWeight:600,fontSize:15,cursor:"pointer"}}>
+              Agregar cuenta
+            </button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("app")).render(<App/>);
+</script>
+
+<!-- SERVICE WORKER -->
+<script>
+if("serviceWorker" in navigator){
+  const swCode=`
+    const CACHE="fincontrol-v1";
+    self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["/"]))));
+    self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match("/")))));
+  `;
+  const blob=new Blob([swCode],{type:"application/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+</script>
+</body>
+</html>
